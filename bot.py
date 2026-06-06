@@ -1,392 +1,553 @@
-import asyncio  
-import logging  
-import random  
-from datetime import datetime, timedelta  
-import pytz  
-import re  
-  
-import aiosqlite  
-from aiogram import Bot, Dispatcher, types, F  
-from aiogram.filters import Command  
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton  
-from aiogram.fsm.storage.memory import MemoryStorage  
-from apscheduler.schedulers.asyncio import AsyncIOScheduler  
-  
-# ============================================================  
-# НАСТРОЙКИ  
-# ============================================================  
-BOT_TOKEN = "8988206711:AAGmjkJ0t-hz0iU1cDmIgsXK9sXvxk6xJzg"  
-  
-ADMIN_ID = 7756969434  
-MONOBANK_LINK = "https://send.monobank.ua/jar/5gfL2BGRr3"  
-  
-TIMEZONE = "Europe/Kiev"  
-DB_NAME = "miky.db"  
-FREE_DAYS = 7  
-# ============================================================  
-  
-logging.basicConfig(level=logging.INFO)  
-  
-bot = Bot(token=BOT_TOKEN)  
-dp = Dispatcher(storage=MemoryStorage())  
-scheduler = AsyncIOScheduler(timezone=TIMEZONE)  
-tz = pytz.timezone(TIMEZONE)  
-  
-# ============================================================  
-# МОТИВАЦИОННЫЕ СООБЩЕНИЯ  
-# ============================================================  
-MESSAGES_LIST = [  
-    "Лучшее время начать — сейчас, а не завтра.", "Маленькие шаги каждый день приводят к большим результатам.",  
-    "Не жди идеального момента — действуй, имея то, что есть.", "Страх — это лишь сигнал, что ты на пороге чего-то важного.",  
-    "Одна попытка стоит больше, чем сто сожалений.", "Дорогу осилит идущий, даже если он идет медленно.",  
-    "Твои действия громче твоих слов.", "Сделай первый шаг, и путь появится сам.",  
-    "Не бойся ошибаться — бойся стоять на месте.", "Каждый новый день — это чистый лист. Напиши свою историю.",  
-    "Двигайся, даже если кажется, что нет сил.", "Начни с того, что есть, сделай то, что можешь.",  
-    "Лучше сделать и пожалеть, чем не сделать и жалеть всю жизнь.", "Возьми ответственность за свою жизнь в свои руки.",  
-    "Мысль без действия — всего лишь мечта.", "Ты способен на гораздо большее, чем думаешь.",  
-    "Никто не может заставить тебя чувствовать себя неполноценным без твоего согласия.",  
-    "Сравнивай себя только с собой вчерашним.", "Твоя ценность не зависит от мнения других людей.",  
-    "Ты — автор своей жизни, не будь просто читателем.", "Доверяй своему внутреннему голосу.",  
-    "У тебя есть всё необходимое, чтобы добиться успеха.", "Ты уникален, и в этом твоя сила.",  
-    "Перестань искать одобрения — найди себя.", "Верь в свою идею, даже если никто не верит.",  
-    "Твоё прошлое — не приговор. Это опыт.", "Ты уже пережил 100% своих плохих дней.",  
-    "Не уменьшай свою ценность, чтобы угодить другим.", "Прими свои недостатки — они делают тебя настоящим.",  
-    "Ты достоин счастья, успеха и любви.", "После дождя всегда приходит радуга.",  
-    "Падать не страшно — страшно не подниматься.", "Любая неудача — это урок, а не финал.",  
-    "Трудности делают тебя сильнее.", "Стена стоит только на пути тех, кто не хочет её обойти.",  
-    "Самые сильные люди рождаются из самых сложных ситуаций.", "Сдаться — это единственный способ проиграть.",  
-    "В конце каждой туннеля есть свет, просто нужно продолжать идти.", "Не проблема важна, а твоя реакция на неё.",  
-    "Разреши себе быть несовершенным, но настойчивым.", "Всё, что тебя не убивает, делает тебя мудрее.",  
-    "Твой предел — это только то, что ты сам себе установил.", "Вместо «Почему это случилось со мной?» спроси «Чему это меня учит?».",  
-    "Самая большая слава — не в том, чтобы никогда не падать, а в том, чтобы вставать каждый раз.",  
-    "Шторм заканчивается, и море снова становится спокойным.", "Капля камень точит не силой, а частотой падения.",  
-    "Дисциплина — это мост между целями и их достижением.", "Система важнее, чем мотивация.",  
-    "Делай сегодня то, что другие не хотят, чтобы завтра жить так, как другие не могут.",  
-    "Поставь цель и не отвлекайся на шум.", "1% улучшения каждый день = 3700% в год.",  
-    "Упорство побеждает талант, если талант не упорен.", "Сфокусируйся на процессе, результат придет сам.",  
-    "Легких путей к великим целям не бывает.", "Твоя зона комфорта — враг твоего роста.",  
-    "Иди к цели с упорством голодного волка.", "Каждый пропущенный день — это шаг назад.",  
-    "Сначала ты работаешь на свою репутацию, потом репутация работает на тебя.",  
-    "Не откладывай жизнь на потом — живи сейчас, достигай сейчас.", "Терпение — это не пассивность, это сила выдержки.",  
-    "Мир полон возможностей, нужно только открыть глаза.", "Твои мысли формируют твою реальность.",  
-    "Окружай себя теми, кто поднимает тебя вверх.", "Читай. Учись. Расти. Повторяй.",  
-    "Позитивное мышление притягивает позитивные события.", "Вдохновение — это гость, который не любит посещать ленивых.",  
-    "Знание — это сила, а применение знания — суперсила.", "Будь благодарен за то, что имеешь, пока стремишься к большему.",  
-    "Ты — это среднее из пяти людей, с которыми проводишь больше всего времени.",  
-    "Инвестируй в себя — это единственное вложение, которое всегда окупается.",  
-    "Креативность — это просто соединение вещей.", "Любопытство — двигатель прогресса.",  
-    "Будь тем изменением, которое хочешь видеть в мире.", "Учись видеть хорошее в каждом дне.",  
-    "Мечты сбываются, когда ты перестаешь просто мечтать и начинаешь делать.",  
-    "Отдавай миру больше, чем берёшь.", "Искренность — самая сильная валюта.",  
-    "Умение слушать — редкий дар. Используй его.", "Помощь другим — лучший способ помочь себе.",  
-    "Создавай связи, а не контакты.", "Делай добро, и оно к тебе вернётся.",  
-    "Цени людей, которые верят в тебя, когда ты сам в себя не веришь.",  
-    "Твой успех — это успех твоей команды.", "Прощение — это не слабость, это освобождение.",  
-    "Будь лидером, а не начальником.", "Слово может ранить, но может и вдохновить. Выбирай мудро.",  
-    "Вдохновляй своим примером.", "Поддерживай других на их пути, и твой путь станет легче.",  
-    "Не суди людей, пока не прошел милю в их ботинках.", "Каждый человек несёт свою историю — будь добр.",  
-    "Улыбка — это самый короткий путь между двумя людьми.", "Настоящая дружба проверяется в трудные времена.",  
-    "Люби себя достаточно, чтобы требовать уважения.", "Твоё время — самый ценный ресурс. Трать его мудро.",  
-    "Сегодняшний день больше не повторится. Сделай его значимым.", "Маленькие победы складываются в большой успех.",  
-    "Живи так, чтобы вспоминать с улыбкой.", "Ты сильнее, чем кажешься, и умнее, чем думаешь.",  
-    "Каждый шаг вперёд — это победа над вчерашним собой."  
-]  
-  
-# ============================================================  
-# БАЗА ДАННЫХ  
-# ============================================================  
-async def init_db():  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        await db.execute("""CREATE TABLE IF NOT EXISTS users (  
-            user_id INTEGER PRIMARY KEY,  
-            username TEXT,  
-            first_name TEXT,  
-            is_paid INTEGER DEFAULT 0,  
-            paid_until TEXT,  
-            joined_at TEXT  
-        )""")  
-        await db.execute("""CREATE TABLE IF NOT EXISTS events (  
-            id INTEGER PRIMARY KEY AUTOINCREMENT,  
-            user_id INTEGER,  
-            text TEXT,  
-            event_date TEXT,  
-            event_time TEXT,  
-            reminded_morning INTEGER DEFAULT 0,  
-            reminded_30min INTEGER DEFAULT 0,  
-            created_at TEXT  
-        )""")  
-        await db.execute("""CREATE TABLE IF NOT EXISTS sent_quotes (  
-            user_id INTEGER,  
-            quote_index INTEGER,  
-            UNIQUE(user_id, quote_index)  
-        )""")  
-        await db.commit()  
-  
-async def get_user(user_id: int):  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        async with db.execute("SELECT * FROM users WHERE user_id=?", (user_id,)) as cursor:  
-            return await cursor.fetchone()  
-  
-async def is_paid(user_id: int) -> bool:  
-    if user_id == ADMIN_ID:  
-        return True  
-    user = await get_user(user_id)  
-    if not user or user[3] != 1 or not user[4]:  
-        return False  
-    now = datetime.now(tz).strftime("%Y-%m-%d")  
-    return user[4] >= now  
-  
-async def register_user(user_id: int, username: str = None, first_name: str = None):  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        paid_until = (datetime.now(tz) + timedelta(days=FREE_DAYS)).strftime("%Y-%m-%d")  
-        await db.execute(  
-            """INSERT OR IGNORE INTO users   
-               (user_id, username, first_name, is_paid, paid_until, joined_at)   
-               VALUES (?,?,?,?,?,?)""",  
-            (user_id, username, first_name, 1, paid_until, datetime.now(tz).isoformat())  
-        )  
-        await db.commit()  
-    return paid_until  
-  
-async def activate_user(user_id: int):  
-    paid_until = (datetime.now(tz) + timedelta(days=30)).strftime("%Y-%m-%d")  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        await db.execute("UPDATE users SET is_paid=1, paid_until=? WHERE user_id=?", (paid_until, user_id))  
-        await db.commit()  
-    return paid_until  
-  
-async def get_random_quote(user_id: int):  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        async with db.execute("SELECT quote_index FROM sent_quotes WHERE user_id=?", (user_id,)) as cursor:  
-            used = [row[0] for row in await cursor.fetchall()]  
-        available = [i for i in range(len(MESSAGES_LIST)) if i not in used]  
-        if not available:  
-            await db.execute("DELETE FROM sent_quotes WHERE user_id=?", (user_id,))  
-            await db.commit()  
-            available = list(range(len(MESSAGES_LIST)))  
-        idx = random.choice(available)  
-        await db.execute("INSERT OR IGNORE INTO sent_quotes VALUES (?,?)", (user_id, idx))  
-        await db.commit()  
-        return MESSAGES_LIST[idx]  
-  
-async def save_event(user_id: int, text: str, event_date=None, event_time=None):  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        await db.execute(  
-            "INSERT INTO events (user_id, text, event_date, event_time, created_at) VALUES (?,?,?,?,?)",  
-            (user_id, text, event_date, event_time, datetime.now(tz).isoformat())  
-        )  
-        await db.commit()  
-  
-async def get_week_events(user_id: int):  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        today = datetime.now(tz).date()  
-        week_end = today + timedelta(days=7)  
-        async with db.execute(  
-            "SELECT text, event_date, event_time FROM events WHERE user_id=? AND event_date BETWEEN ? AND ? ORDER BY event_date, event_time",  
-            (user_id, today.strftime("%Y-%m-%d"), week_end.strftime("%Y-%m-%d"))  
-        ) as cursor:  
-            return await cursor.fetchall()  
-  
-async def get_today_events(user_id: int):  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        today = datetime.now(tz).strftime("%Y-%m-%d")  
-        async with db.execute(  
-            "SELECT id, text, event_time FROM events WHERE user_id=? AND event_date=? ORDER BY event_time",  
-            (user_id, today)  
-        ) as cursor:  
-            return await cursor.fetchall()  
-  
-async def get_all_paid_users():  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        today = datetime.now(tz).strftime("%Y-%m-%d")  
-        async with db.execute(  
-            "SELECT user_id, username, first_name FROM users WHERE is_paid=1 AND paid_until>=?", (today,)  
-        ) as cursor:  
-            return await cursor.fetchall()  
-  
-# ============================================================  
-# ПАРСИНГ ДАТЫ  
-# ============================================================  
-def parse_datetime(text):  
-    text_lower = text.lower()  
-    today = datetime.now(tz).date()  
-    event_date = None  
-    event_time = None  
-  
-    time_match = re.search(r'\b(\d{1,2})[:\.](\d{2})\b', text)  
-    if time_match:  
-        h, m = int(time_match.group(1)), int(time_match.group(2))  
-        if 0 <= h <= 23 and 0 <= m <= 59:  
-            event_time = f"{h:02d}:{m:02d}"  
-  
-    if "сегодня" in text_lower:  
-        event_date = today.strftime("%Y-%m-%d")  
-    elif "завтра" in text_lower:  
-        event_date = (today + timedelta(days=1)).strftime("%Y-%m-%d")  
-    elif "послезавтра" in text_lower:  
-        event_date = (today + timedelta(days=2)).strftime("%Y-%m-%d")  
-  
-    days_map = {"понедельник":0, "вторник":1, "среда":2, "среду":2, "четверг":3, "пятница":4, "пятницу":4,  
-                "суббота":5, "субботу":5, "воскресенье":6}  
-    if not event_date:  
-        for day_name, day_num in days_map.items():  
-            if day_name in text_lower:  
-                diff = (day_num - today.weekday()) % 7  
-                if diff == 0: diff = 7  
-                event_date = (today + timedelta(days=diff)).strftime("%Y-%m-%d")  
-                break  
-    return event_date, event_time  
-  
-# ============================================================  
-# ХЕНДЛЕРЫ  
-# ============================================================  
-@dp.message(Command("start"))  
-async def cmd_start(msg: Message):  
-    paid_until = await register_user(msg.from_user.id, msg.from_user.username, msg.from_user.first_name)  
-    name = msg.from_user.first_name or msg.from_user.username or "друг"  
-    await msg.answer(  
-        f"👋 Привет, {name}!\n\n"  
-        f"🎉 Тебе активировано **{FREE_DAYS} дней бесплатно** до {paid_until}!\n\n"  
-        f"Просто пиши мне о планах — я запомню и напомню 🐕",  
-        parse_mode="Markdown"  
-    )  
-  
-@dp.message(Command("pay"))  
-async def cmd_pay(msg: Message):  
-    kb = InlineKeyboardMarkup(inline_keyboard=[  
-        [InlineKeyboardButton(text="💳 Оплатить 50 грн", url=MONOBANK_LINK)],  
-        [InlineKeyboardButton(text="✅ Я оплатил(а)", callback_data=f"paid_{msg.from_user.id}")]  
-    ])  
-    await msg.answer("💰 *Продление подписки*\n\nЦена: 50 грн / месяц", parse_mode="Markdown", reply_markup=kb)  
-  
-@dp.callback_query(F.data.startswith("paid_"))  
-async def cb_paid(callback: types.CallbackQuery):  
-    user_id = int(callback.data.split("_")[1])  
-    kb = InlineKeyboardMarkup(inline_keyboard=[  
-        [InlineKeyboardButton(text="✅ Активировать", callback_data=f"activate_{user_id}")],  
-        [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{user_id}")]  
-    ])  
-    await bot.send_message(ADMIN_ID, f"💰 Запрос на оплату!\nID: `{user_id}`", parse_mode="Markdown", reply_markup=kb)  
-    await callback.answer("Отправлено")  
-  
-@dp.callback_query(F.data.startswith("activate_"))  
-async def cb_activate(callback: types.CallbackQuery):  
-    if callback.from_user.id != ADMIN_ID: return  
-    user_id = int(callback.data.split("_")[1])  
-    paid_until = await activate_user(user_id)  
-    await bot.send_message(user_id, f"🎉 Подписка продлена до {paid_until}!", parse_mode="Markdown")  
-    await callback.message.edit_text(f"✅ Продлено до {paid_until}")  
-  
-@dp.callback_query(F.data.startswith("reject_"))  
-async def cb_reject(callback: types.CallbackQuery):  
-    if callback.from_user.id != ADMIN_ID: return  
-    user_id = int(callback.data.split("_")[1])  
-    await bot.send_message(user_id, "❌ Оплата не подтверждена.")  
-    await callback.message.edit_text("❌ Отклонено")  
-  
-@dp.message(Command("plans"))  
-async def cmd_plans(msg: Message):  
-    if not await is_paid(msg.from_user.id):  
-        await msg.answer("🔒 Доступно только после оплаты. Напиши /pay")  
-        return  
-    events = await get_week_events(msg.from_user.id)  
-    if not events:  
-        await msg.answer("📭 Планов на неделю нет.")  
-        return  
-    text = "📅 *Планы на неделю:*\n\n" + "\n".join([f"• {ev[0]} — {ev[1]}" + (f" в {ev[2]}" if ev[2] else "") for ev in events])  
-    await msg.answer(text, parse_mode="Markdown")  
-  
-@dp.message(Command("today"))  
-async def cmd_today(msg: Message):  
-    if not await is_paid(msg.from_user.id):  
-        await msg.answer("🔒 Доступно только после оплаты. Напиши /pay")  
-        return  
-    events = await get_today_events(msg.from_user.id)  
-    if not events:  
-        await msg.answer("📭 На сегодня планов нет.")  
-        return  
-    text = "📋 *Задачи на сегодня:*\n\n" + "\n".join([f"• {ev[1]}" + (f" в {ev[2]}" if ev[2] else "") for ev in events])  
-    await msg.answer(text, parse_mode="Markdown")  
-  
-@dp.message()  
-async def handle_any(msg: Message):  
-    if not await is_paid(msg.from_user.id):  
-        await msg.answer("🔒 Для сохранения планов нужна подписка — /pay")  
-        return  
-    text = msg.text or msg.caption or "[медиа]"  
-    event_date, event_time = parse_datetime(text)  
-    await save_event(msg.from_user.id, text, event_date, event_time)  
-    reply = "✅ Записала!"  
-    if event_date:  
-        reply += f" {event_date}"  
-        if event_time: reply += f" в {event_time}"  
-    await msg.answer(reply)  
-  
-# ============================================================  
-# ПЛАНИРОВЩИК  
-# ============================================================  
-async def send_morning_summary(user_id: int):  
-    events = await get_today_events(user_id)  
-    user = await get_user(user_id)  
-    name = user[2] if user else "друг"  
-    quote = await get_random_quote(user_id)  
-    if not events:  
-        text = f"🌅 Доброе утро, *{name}*!\n\n📭 Планов нет\n\n💫 *Послание дня:*\n_{quote}_"  
-    else:  
-        task_list = "\n".join([f"• {ev[1]}" + (f" в {ev[2]}" if ev[2] else "") for ev in events])  
-        text = f"🌅 Доброе утро, *{name}*!\n\n📋 Задачи:\n{task_list}\n\n💫 *Послание дня:*\n_{quote}_"  
-    await bot.send_message(user_id, text, parse_mode="Markdown")  
-  
-async def morning_job():  
-    users = await get_all_paid_users()  
-    for user in users:  
-        try:  
-            await send_morning_summary(user[0])  
-        except Exception as e:  
-            logging.error(f"Morning error {user[0]}: {e}")  
-  
-async def reminder_30min_job():  
-    async with aiosqlite.connect(DB_NAME) as db:  
-        now = datetime.now(tz)  
-        target = (now + timedelta(minutes=30)).strftime("%H:%M")  
-        today = now.strftime("%Y-%m-%d")  
-        async with db.execute(  
-            "SELECT id, user_id, text FROM events WHERE event_date=? AND event_time=? AND reminded_30min=0",  
-            (today, target)  
-        ) as cursor:  
-            rows = await cursor.fetchall()  
-        for row in rows:  
-            event_id, user_id, text = row  
-            if await is_paid(user_id):  
-                await bot.send_message(user_id, f"⏰ Через 30 минут:\n{text}", parse_mode="Markdown")  
-                await db.execute("UPDATE events SET reminded_30min=1 WHERE id=?", (event_id,))  
-        await db.commit()  
-  
-async def weekly_plan_job():  
-    users = await get_all_paid_users()  
-    for user in users:  
-        try:  
-            events = await get_week_events(user[0])  
-            name = user[2] or "друг"  
-            if not events:  
-                text = f"📅 {name}, планов на неделю пока нет."  
-            else:  
-                task_list = "\n".join([f"• {ev[0]} — {ev[1]}" + (f" в {ev[2]}" if ev[2] else "") for ev in events])  
-                text = f"📅 План на неделю для {name}:\n\n{task_list}"  
-            await bot.send_message(user[0], text, parse_mode="Markdown")  
-        except Exception as e:  
-            logging.error(f"Weekly error: {e}")  
-  
-# ============================================================  
-# ЗАПУСК  
-# ============================================================  
-async def main():  
-    await init_db()  
-    scheduler.add_job(morning_job, "cron", hour=8, minute=0)  
-    scheduler.add_job(reminder_30min_job, "interval", minutes=1)  
-    scheduler.add_job(weekly_plan_job, "cron", day_of_week="sun", hour=17, minute=0)  
-    scheduler.start()  
-    await dp.start_polling(bot)  
-  
-if __name__ == "__main__":  
-    asyncio.run(main())  
+import asyncio
+import logging
+import sqlite3
+import random
+from datetime import datetime, timedelta
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import pytz
+
+# ==============================
+# НАСТРОЙКИ
+# ==============================
+BOT_TOKEN = "8988206711:AAGmjkJ0t-hz0iU1cDmIgsXK9sXvxk6xJzg"
+SUBSCRIPTION_PRICE = 99  # UAH
+TIMEZONE = pytz.timezone("Europe/Kiev")
+TRIAL_DAYS = 7
+
+logging.basicConfig(level=logging.INFO)
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+scheduler = AsyncIOScheduler(timezone=TIMEZONE)
+
+# ==============================
+# ПОСЛАНИЯ (100 штук)
+# ==============================
+MESSAGES = [
+    "Ты способна на всё, что задумаешь 💫",
+    "Каждый день — новый шанс стать лучше 🌱",
+    "Твои мечты заслуживают действий 🚀",
+    "Верь в себя — ты уже на правильном пути ✨",
+    "Маленькие шаги ведут к большим победам 🏆",
+    "Сегодня отличный день для новых начинаний 🌅",
+    "Ты сильнее, чем думаешь 💪",
+    "Твоя энергия заразительна — дари её миру 🌟",
+    "Не сравнивай себя с другими — у тебя свой путь 🌈",
+    "Радость живёт в маленьких моментах 🎈",
+    "Ты заслуживаешь всего самого лучшего 👑",
+    "Сделай один шаг — остальное придёт 🦋",
+    "Твои идеи важны и нужны этому миру 💡",
+    "Сегодня сделай что-то только для себя ❤️",
+    "Трудности делают тебя мудрее 🌊",
+    "Ты уже многого добилась — гордись собой 🎯",
+    "Улыбнись — это меняет всё 😊",
+    "Позволь себе отдыхать — это тоже продуктивность 🍃",
+    "Твоя интуиция — лучший советник 🔮",
+    "Каждая ошибка — урок на пути к успеху 📚",
+    "Ты создаёшь свою реальность мыслями и действиями 🌍",
+    "Будь добра к себе так же, как к близким 🤍",
+    "Сегодняшние усилия — завтрашние результаты ⚡",
+    "Твоя уникальность — твоя суперсила 🦸‍♀️",
+    "Позволь себе мечтать по-крупному 🌙",
+    "Ты меняешь мир вокруг себя к лучшему 🌸",
+    "Всё получится — просто продолжай идти 🛤️",
+    "Ты достаточно хороша прямо сейчас 💝",
+    "Каждый день — подарок, используй его мудро 🎁",
+    "Твоя настойчивость вдохновляет 🔥",
+    "Доверяй процессу — результат придёт 🌿",
+    "Ты окружена людьми, которые тебя любят 🫶",
+    "Твой успех неизбежен 🏅",
+    "Наслаждайся путём, не только целью 🗺️",
+    "Сила внутри тебя — безгранична ⚡",
+    "Ты вдохновляешь других своим примером 🌺",
+    "Хорошие дела возвращаются сторицей 🔄",
+    "Твоё время ценно — трать его на важное ⏰",
+    "Смелость — это не отсутствие страха, а действие вопреки ему 🦁",
+    "Ты заслуживаешь любви и уважения 💖",
+    "Каждое утро — чистый лист 📝",
+    "Ты можешь больше, чем себе позволяешь 🚀",
+    "Твоя улыбка освещает всё вокруг ☀️",
+    "Верь — и мир откликнется 🌠",
+    "Ты на верном пути, даже когда сомневаешься 🧭",
+    "Твои таланты уникальны и ценны 🎨",
+    "Будь собой — это лучшее, что ты можешь делать 💎",
+    "Сегодня ты ближе к цели, чем вчера 📈",
+    "Твоя история ещё пишется — и она прекрасна ✍️",
+    "Делай с любовью — и всё будет хорошо 💓",
+    "Ты справишься — ты всегда справляешься 🌟",
+    "Позволь себе быть несовершенной — это нормально 🌼",
+    "Твои границы — это твоя сила 🛡️",
+    "Каждый момент имеет значение 🕊️",
+    "Ты создана для великих вещей 👸",
+    "Доверяй себе больше 🔑",
+    "Твоё спокойствие — твоя власть 🌊",
+    "Радость — твой естественный state 🎶",
+    "Ты заслуживаешь отдыха без чувства вины 🛁",
+    "Твои планы важны — и ты важна 🌹",
+    "Всё, что ты делаешь — имеет смысл 🎯",
+    "Ты богаче, чем думаешь — опытом, любовью, мудростью 💰",
+    "Сегодня — идеальный день для маленьких побед 🏆",
+    "Твоя забота о себе — это инвестиция 💅",
+    "Каждая задача, которую ты ставишь — выполнима 📌",
+    "Ты умеешь находить выход из любой ситуации 🗝️",
+    "Твоя интуиция никогда тебя не подводила 🔮",
+    "Позволь хорошему случиться 🍀",
+    "Твои усилия видны — даже когда кажется иначе 👀",
+    "Ты меняешься к лучшему каждый день 🌱",
+    "Всё в твоей жизни складывается правильно 🧩",
+    "Ты заслуживаешь того, о чём мечтаешь 💭",
+    "Твоё «нет» так же важно, как «да» 🚦",
+    "Ты — автор своей жизни ✒️",
+    "Сегодня сделай что-то, что тебя радует 🎠",
+    "Ты не одна — у тебя есть поддержка 🤝",
+    "Твои мысли формируют реальность — выбирай лучшие 💬",
+    "Ты уже победила, встав и начав день 🌤️",
+    "Настоящий момент — лучший момент 🕰️",
+    "Твои чувства важны и заслуживают внимания 💙",
+    "Ты справляешься лучше, чем думаешь 🌟",
+    "Маленький прогресс — это всё равно прогресс 📊",
+    "Ты достойна всего хорошего без условий 🎀",
+    "Позволь себе сиять ✨",
+    "Твоя жизнь — произведение искусства 🖼️",
+    "Каждая задача начинается с первого шага 👣",
+    "Ты умная, смелая и красивая 🌸",
+    "Твоя работа над собой заметна 🪞",
+    "Сегодня хороший день быть живой 🌍",
+    "Ты привлекаешь то, что излучаешь — излучай добро ☀️",
+    "Твоя цель уже ждёт тебя 🎯",
+    "Всё, что ты делаешь — важно 💼",
+    "Ты — источник вдохновения для тех, кто рядом 🕯️",
+    "Твои мечты реальны — действуй 🌟",
+    "Сегодня и каждый день — ты достаточна 💗",
+    "Жизнь любит тебя — открой ей сердце 💞",
+    "Ты создана для радости и процветания 🌺",
+    "Верь в себя — это самое важное 🙌",
+]
+
+# ==============================
+# БАЗА ДАННЫХ
+# ==============================
+def init_db():
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            first_name TEXT,
+            is_paid INTEGER DEFAULT 0,
+            used_messages TEXT DEFAULT '',
+            trial_start TEXT DEFAULT NULL
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            text TEXT,
+            event_date TEXT,
+            event_time TEXT,
+            notified_morning INTEGER DEFAULT 0,
+            notified_30min INTEGER DEFAULT 0,
+            created_at TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def get_user(user_id):
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    return row
+
+def create_user(user_id, username, first_name):
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    trial_start = datetime.now(TIMEZONE).isoformat()
+    c.execute(
+        "INSERT OR IGNORE INTO users (user_id, username, first_name, trial_start) VALUES (?,?,?,?)",
+        (user_id, username, first_name, trial_start)
+    )
+    conn.commit()
+    conn.close()
+
+def has_access(user_id):
+    """Проверяет: оплачено ИЛИ триал ещё активен"""
+    user = get_user(user_id)
+    if not user:
+        return False
+    is_paid_flag = user[3] == 1
+    if is_paid_flag:
+        return True
+    # Проверка триала (колонка 5 = trial_start)
+    trial_start = user[5] if len(user) > 5 else None
+    if trial_start:
+        start_dt = datetime.fromisoformat(trial_start)
+        if start_dt.tzinfo is None:
+            start_dt = TIMEZONE.localize(start_dt)
+        now = datetime.now(TIMEZONE)
+        if (now - start_dt).days < TRIAL_DAYS:
+            return True
+    return False
+
+def trial_days_left(user_id):
+    user = get_user(user_id)
+    if not user or len(user) <= 5 or not user[5]:
+        return 0
+    start_dt = datetime.fromisoformat(user[5])
+    if start_dt.tzinfo is None:
+        start_dt = TIMEZONE.localize(start_dt)
+    elapsed = (datetime.now(TIMEZONE) - start_dt).days
+    return max(0, TRIAL_DAYS - elapsed)
+
+def set_paid(user_id):
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("UPDATE users SET is_paid=1 WHERE user_id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def save_task(user_id, text, event_date=None, event_time=None):
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO tasks (user_id, text, event_date, event_time, created_at)
+        VALUES (?,?,?,?,?)
+    """, (user_id, text, event_date, event_time, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def get_tasks_for_week(user_id):
+    now = datetime.now(TIMEZONE)
+    week_end = now + timedelta(days=7)
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("""
+        SELECT text, event_date, event_time FROM tasks
+        WHERE user_id=? AND event_date >= ? AND event_date <= ?
+        ORDER BY event_date, event_time
+    """, (user_id, now.strftime("%Y-%m-%d"), week_end.strftime("%Y-%m-%d")))
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def get_tasks_for_today(user_id):
+    today = datetime.now(TIMEZONE).strftime("%Y-%m-%d")
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("""
+        SELECT id, text, event_time FROM tasks
+        WHERE user_id=? AND event_date=?
+        ORDER BY event_time
+    """, (user_id, today))
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def get_unique_message(user_id):
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("SELECT used_messages FROM users WHERE user_id=?", (user_id,))
+    row = c.fetchone()
+    used = row[0].split(",") if row and row[0] else []
+    used = [int(x) for x in used if x]
+    available = [i for i in range(len(MESSAGES)) if i not in used]
+    if not available:
+        available = list(range(len(MESSAGES)))
+        used = []
+    idx = random.choice(available)
+    used.append(idx)
+    c.execute("UPDATE users SET used_messages=? WHERE user_id=?",
+              (",".join(map(str, used)), user_id))
+    conn.commit()
+    conn.close()
+    return MESSAGES[idx]
+
+def get_all_active_users():
+    """Возвращает всех пользователей с доступом (оплата или триал)"""
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id, first_name, is_paid, trial_start FROM users")
+    rows = c.fetchall()
+    conn.close()
+    result = []
+    for user_id, first_name, is_paid_flag, trial_start in rows:
+        if is_paid_flag:
+            result.append((user_id, first_name))
+        elif trial_start:
+            start_dt = datetime.fromisoformat(trial_start)
+            if start_dt.tzinfo is None:
+                start_dt = TIMEZONE.localize(start_dt)
+            if (datetime.now(TIMEZONE) - start_dt).days < TRIAL_DAYS:
+                result.append((user_id, first_name))
+    return result
+
+# ==============================
+# ПЛАТЁЖНАЯ КНОПКА (Monobank)
+# ==============================
+def payment_keyboard(user_id):
+    pay_url = "https://send.monobank.ua/jar/5gfL2BGRr3"
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 Оплатить 99 UAH — Monobank", url=pay_url)],
+        [InlineKeyboardButton(text="✅ Я оплатил(а)", callback_data=f"check_payment_{user_id}")]
+    ])
+    return kb
+
+# ==============================
+# ХЭНДЛЕРЫ
+# ==============================
+@dp.message(CommandStart())
+async def cmd_start(message: Message):
+    user_id = message.from_user.id
+    username = message.from_user.username or ""
+    first_name = message.from_user.first_name or "друг"
+
+    is_new = get_user(user_id) is None
+    create_user(user_id, username, first_name)
+
+    days_left = trial_days_left(user_id)
+
+    await message.answer(
+        f"Привет! Я твой новый помощник *Mikky* 🌟\n\n"
+        f"Расскажи мне о своих планах!\n\n"
+        f"Просто пиши мне:\n"
+        f"• 📝 Текстовые заметки\n"
+        f"• 📸 Фото\n"
+        f"• 🔗 Ссылки\n"
+        f"• Дату события, например: _Завтра кофе Лена 15:00_\n\n"
+        f"Каждое воскресенье в 17:00 я пришлю план на неделю! 📅",
+        parse_mode="Markdown"
+    )
+
+    if is_new or days_left > 0:
+        await message.answer(
+            f"🎁 *7 дней бесплатно!*\n\n"
+            f"У тебя есть *{days_left} дн.* бесплатного доступа.\n"
+            f"После триала подписка — *99 UAH* 💳",
+            parse_mode="Markdown"
+        )
+
+@dp.callback_query(F.data.startswith("check_payment_"))
+async def check_payment(callback: types.CallbackQuery):
+    user_id = int(callback.data.split("_")[-1])
+    await callback.message.answer(
+        "⏳ Платёж проверяется...\n\n"
+        "После подтверждения я сразу активирую доступ!\n"
+        "Если оплатила — напиши /paid"
+    )
+    await callback.answer()
+
+@dp.message(Command("paid"))
+async def manual_paid(message: Message):
+    set_paid(message.from_user.id)
+    await message.answer("✅ Доступ активирован! Добро пожаловать в Mikky 🎉\n\nТеперь рассказывай о своих планах!")
+
+@dp.message(Command("tasks"))
+async def show_tasks(message: Message):
+    user_id = message.from_user.id
+    if not has_access(user_id):
+        days = trial_days_left(user_id)
+        if days == 0:
+            await message.answer(
+                "🔒 Твой бесплатный период закончился!\n\nОформи подписку, чтобы продолжить 👇",
+                reply_markup=payment_keyboard(user_id)
+            )
+        return
+    tasks = get_tasks_for_today(user_id)
+    if not tasks:
+        await message.answer("На сегодня задач нет 🌿")
+    else:
+        text = "📋 *Твои задачи на сегодня:*\n\n"
+        for _, t, time in tasks:
+            time_str = f" в {time}" if time else ""
+            text += f"• {t}{time_str}\n"
+        await message.answer(text, parse_mode="Markdown")
+
+@dp.message(Command("trial"))
+async def check_trial(message: Message):
+    user_id = message.from_user.id
+    user = get_user(user_id)
+    if not user:
+        await message.answer("Сначала напиши /start")
+        return
+    if user[3] == 1:
+        await message.answer("✅ У тебя активная подписка!")
+        return
+    days = trial_days_left(user_id)
+    if days > 0:
+        await message.answer(f"🎁 Осталось *{days} дн.* бесплатного доступа", parse_mode="Markdown")
+    else:
+        await message.answer(
+            "⏰ Бесплатный период закончился!\n\nОформи подписку 👇",
+            reply_markup=payment_keyboard(user_id)
+        )
+
+@dp.message(F.photo)
+async def handle_photo(message: Message):
+    user_id = message.from_user.id
+    if not has_access(user_id):
+        await message.answer("🔒 Бесплатный период закончился!", reply_markup=payment_keyboard(user_id))
+        return
+    caption = message.caption or "📸 Фото"
+    save_task(user_id, caption)
+    days = trial_days_left(user_id)
+    extra = f"\n_Осталось {days} дн. бесплатного доступа_" if days > 0 and get_user(user_id)[3] == 0 else ""
+    await message.answer(f"📸 Сохранила фото в твои планы!{extra}", parse_mode="Markdown")
+
+@dp.message(F.text)
+async def handle_text(message: Message):
+    user_id = message.from_user.id
+    if not has_access(user_id):
+        await message.answer(
+            "🔒 Твой бесплатный период закончился!\n\nОформи подписку, чтобы продолжить 👇",
+            reply_markup=payment_keyboard(user_id)
+        )
+        return
+
+    text = message.text
+    event_date, event_time = parse_datetime(text)
+    save_task(user_id, text, event_date, event_time)
+
+    days = trial_days_left(user_id)
+    extra = f"\n_Осталось {days} дн. бесплатного доступа_" if days > 0 and get_user(user_id)[3] == 0 else ""
+
+    if event_date:
+        await message.answer(
+            f"✅ Записала! Напомню {event_date}" + (f" в {event_time}" if event_time else "") + f" 🗓️{extra}",
+            parse_mode="Markdown"
+        )
+    else:
+        await message.answer(f"✅ Записала в твои планы!{extra}", parse_mode="Markdown")
+
+# ==============================
+# ПАРСИНГ ДАТЫ
+# ==============================
+def parse_datetime(text):
+    import re
+    now = datetime.now(TIMEZONE)
+    event_date = None
+    event_time = None
+    text_lower = text.lower()
+    if "сегодня" in text_lower:
+        event_date = now.strftime("%Y-%m-%d")
+    elif "завтра" in text_lower:
+        event_date = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    elif "послезавтра" in text_lower:
+        event_date = (now + timedelta(days=2)).strftime("%Y-%m-%d")
+    time_match = re.search(r'\b(\d{1,2}):(\d{2})\b', text)
+    if time_match:
+        event_time = time_match.group(0)
+    return event_date, event_time
+
+# ==============================
+# ПЛАНИРОВЩИК
+# ==============================
+async def send_weekly_summary():
+    users = get_all_active_users()
+    for user_id, first_name in users:
+        tasks = get_tasks_for_week(user_id)
+        msg_of_day = get_unique_message(user_id)
+        if not tasks:
+            text = (f"📅 *План на следующую неделю*\n\n"
+                    f"Пока задач нет — расскажи мне о планах!\n\n"
+                    f"_{msg_of_day}_")
+        else:
+            text = f"📅 *План на следующую неделю, {first_name}!*\n\n"
+            for task_text, date, time in tasks:
+                time_str = f" в {time}" if time else ""
+                text += f"• {date}{time_str} — {task_text}\n"
+            text += f"\n_{msg_of_day}_"
+        try:
+            await bot.send_message(user_id, text, parse_mode="Markdown")
+        except Exception as e:
+            logging.error(f"Ошибка отправки {user_id}: {e}")
+
+async def send_morning_reminders():
+    users = get_all_active_users()
+    for user_id, first_name in users:
+        tasks = get_tasks_for_today(user_id)
+        if not tasks:
+            continue
+        msg_of_day = get_unique_message(user_id)
+        text = f"🌅 Привет, *{first_name}*!\n\n*Твои задачи на сегодня:*\n\n"
+        for _, task_text, time in tasks:
+            time_str = f" в {time}" if time else ""
+            text += f"• {task_text}{time_str}\n"
+        text += f"\n_{msg_of_day}_"
+        try:
+            await bot.send_message(user_id, text, parse_mode="Markdown")
+        except Exception as e:
+            logging.error(f"Ошибка: {e}")
+
+async def send_30min_reminders():
+    now = datetime.now(TIMEZONE)
+    target_time = (now + timedelta(minutes=30)).strftime("%H:%M")
+    today = now.strftime("%Y-%m-%d")
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("""
+        SELECT tasks.id, tasks.user_id, tasks.text, users.first_name
+        FROM tasks JOIN users ON tasks.user_id = users.user_id
+        WHERE tasks.event_date=? AND tasks.event_time=? AND tasks.notified_30min=0
+    """, (today, target_time))
+    rows = c.fetchall()
+    for task_id, user_id, task_text, first_name in rows:
+        if not has_access(user_id):
+            continue
+        try:
+            await bot.send_message(
+                user_id,
+                f"⏰ *{first_name}*, через 30 минут:\n\n_{task_text}_",
+                parse_mode="Markdown"
+            )
+            c.execute("UPDATE tasks SET notified_30min=1 WHERE id=?", (task_id,))
+        except Exception as e:
+            logging.error(f"Ошибка: {e}")
+    conn.commit()
+    conn.close()
+
+async def notify_trial_ending():
+    """За 1 день до конца триала — напомнить об оплате"""
+    conn = sqlite3.connect("mikky.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id, first_name, trial_start FROM users WHERE is_paid=0")
+    rows = c.fetchall()
+    conn.close()
+    for user_id, first_name, trial_start in rows:
+        if not trial_start:
+            continue
+        start_dt = datetime.fromisoformat(trial_start)
+        if start_dt.tzinfo is None:
+            start_dt = TIMEZONE.localize(start_dt)
+        days_elapsed = (datetime.now(TIMEZONE) - start_dt).days
+        if days_elapsed == TRIAL_DAYS - 1:
+            try:
+                await bot.send_message(
+                    user_id,
+                    f"⏰ *{first_name}*, завтра заканчивается бесплатный период!\n\n"
+                    f"Оформи подписку, чтобы продолжить пользоваться Mikky 💛",
+                    parse_mode="Markdown",
+                    reply_markup=payment_keyboard(user_id)
+                )
+            except Exception as e:
+                logging.error(f"Ошибка: {e}")
+
+# ==============================
+# ЗАПУСК
+# ==============================
+async def main():
+    init_db()
+    scheduler.add_job(send_weekly_summary, "cron", day_of_week="sun", hour=17, minute=0)
+    scheduler.add_job(send_morning_reminders, "cron", hour=8, minute=0)
+    scheduler.add_job(send_30min_reminders, "interval", minutes=5)
+    scheduler.add_job(notify_trial_ending, "cron", hour=10, minute=0)
+    scheduler.start()
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
