@@ -18,7 +18,7 @@ import pytz
 BOT_TOKEN = "8988206711:AAGmjkJ0t-hz0iU1cDmIgsXK9sXvxk6xJzg"
 TIMEZONE = pytz.timezone("Europe/Kiev")
 TRIAL_DAYS = 7
-STAR_PRICE = 300                    # ≈ 99 UAH / 3-4 USD
+STAR_PRICE = 300
 MONOBANK_URL = "https://send.monobank.ua/jar/5gfL2BGRr3"
 
 logging.basicConfig(level=logging.INFO)
@@ -27,7 +27,7 @@ dp = Dispatcher()
 scheduler = AsyncIOScheduler(timezone=TIMEZONE)
 
 # ==============================
-# ЯЗЫКИ
+# ЯЗЫКИ И ПЕРЕВОДЫ
 # ==============================
 LANGUAGES = {
     'en': '🇬🇧 English', 'zh': '🇨🇳 中文 (普通话)', 'hi': '🇮🇳 हिन्दी',
@@ -39,9 +39,6 @@ LANGUAGES = {
     'yue': '🇨🇳 粤语', 'vi': '🇻🇳 Tiếng Việt'
 }
 
-# ==============================
-# ПЕРЕВОДЫ
-# ==============================
 TRANSLATIONS = {
     'en': {
         'start_hello': "🌟 Hello! I am your new helper *Mikky*! 🌟\n\nChoose your language:",
@@ -62,17 +59,17 @@ TRANSLATIONS = {
 }
 
 # ==============================
-# МОТИВАЦИОННЫЕ СООБЩЕНИЯ (добавь все 100)
+# МОТИВАЦИЯ (добавь все свои сообщения)
 # ==============================
 MESSAGES = [
     "Ты способна на всё, что задумаешь 💫", "Каждый день — новый шанс стать лучше 🌱",
     "Твои мечты заслуживают действий 🚀", "Верь в себя — ты уже на правильном пути ✨",
-    # ... вставь остальные ...
+    "Маленькие шаги ведут к большим победам 🏆", "Сегодня отличный день для новых начинаний 🌅",
     "Всё в твоей жизни складывается правильно 🧩"
 ]
 
 # ==============================
-# БАЗА ДАННЫХ (без изменений)
+# БАЗА ДАННЫХ
 # ==============================
 def init_db():
     conn = sqlite3.connect("mikky.db")
@@ -186,11 +183,10 @@ def main_menu_keyboard(lang: str = 'ru'):
         ], resize_keyboard=True, persistent=True)
 
 def payment_keyboard(lang: str = 'ru'):
-    kb = InlineKeyboardMarkup(inline_keyboard=[
+    return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💳 Monobank (Украина)", url=MONOBANK_URL)],
         [InlineKeyboardButton(text=f"⭐ Telegram Stars ({STAR_PRICE} Stars)", callback_data="pay_stars")]
     ])
-    return kb
 
 # ==============================
 # ХЕНДЛЕРЫ
@@ -205,7 +201,6 @@ async def cmd_start(message: Message):
         await send_main_welcome(message, lang, message.from_user.first_name)
         return
 
-    # Выбор языка на английском
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=name, callback_data=f"set_lang_{code}")]
         for code, name in LANGUAGES.items()
@@ -262,12 +257,12 @@ async def successful_payment(message: Message):
     await message.answer("✅ Оплата прошла успешно!\nПодписка активирована на 30 дней 🌟", 
                         reply_markup=main_menu_keyboard(lang))
 
-# ==================== КОМАНДЫ МЕНЮ ====================
-@dp.message(Command(["новая_задача", "new_task"]))
+# ==================== КОМАНДЫ МЕНЮ (ИСПРАВЛЕНО!) ====================
+@dp.message(Command(commands=["новая_задача", "new_task"]))
 async def new_task_cmd(message: Message):
     await message.answer("✅ Напиши новую задачу (можно с датой и временем):")
 
-@dp.message(Command(["мои_задачи_на_день", "today_tasks"]))
+@dp.message(Command(commands=["мои_задачи_на_день", "today_tasks"]))
 async def today_tasks_cmd(message: Message):
     user_id = message.from_user.id
     lang = get_user_language(user_id)
@@ -281,7 +276,7 @@ async def today_tasks_cmd(message: Message):
             text += f"• {time_str}{task_text}\n"
     await message.answer(text, parse_mode="Markdown")
 
-@dp.message(Command(["мои_задачи_на_неделю", "week_tasks"]))
+@dp.message(Command(commands=["мои_задачи_на_неделю", "week_tasks"]))
 async def week_tasks_cmd(message: Message):
     user_id = message.from_user.id
     lang = get_user_language(user_id)
@@ -294,11 +289,19 @@ async def week_tasks_cmd(message: Message):
             text += f"• {date} {time or ''} — {task_text}\n"
     await message.answer(text, parse_mode="Markdown")
 
-@dp.message(Command(["мои_задачи_на_месяц", "month_tasks"]))
+@dp.message(Command(commands=["мои_задачи_на_месяц", "month_tasks"]))
 async def month_tasks_cmd(message: Message):
     await week_tasks_cmd(message)
 
-# ==================== РАССЫЛКА ====================
+@dp.message(Command(commands=["просто_сделать", "quick_task"]))
+async def quick_task_cmd(message: Message):
+    await message.answer("Что нужно быстро сделать? Напиши:")
+
+@dp.message(Command(commands=["не_сделано", "not_done"]))
+async def not_done_cmd(message: Message):
+    await message.answer("Какая задача не сделана? Напиши, помогу.")
+
+# ==================== ЕЖЕДНЕВНАЯ РАССЫЛКА ====================
 async def send_daily_plan():
     for user_id, first_name, lang in get_all_active_users():
         tasks = get_tasks_for_today(user_id)
