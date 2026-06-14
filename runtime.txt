@@ -1,0 +1,2 @@
+3.12
+Pin Python to 3.12
