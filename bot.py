@@ -324,12 +324,6 @@ def main_menu_keyboard(lang='ru'):
             [KeyboardButton(text="✅ Done"), KeyboardButton(text="📋 All Tasks")]
         ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, persistent=True)
-@dp.callback_query(F.data.startswith("set_lang_"))
-async def set_language(callback: CallbackQuery):
-    lang = callback.data.split("_")[-1]
-    update_user_language(callback.from_user.id, lang)
-    await callback.message.edit_text(f"✅ {LANGUAGES.get(lang, lang)}")
-    await send_main_welcome(callback.message, lang, callback.from_user.first_name)
 
 async def send_main_welcome(message: Message, lang: str, name="друг"):
     t = TRANSLATIONS.get(lang, TRANSLATIONS['en'])
