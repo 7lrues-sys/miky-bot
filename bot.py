@@ -301,14 +301,29 @@ def get_all_users():
 
 # ==============================
 # КЛАВІАТУРИ
-# ==============================
 def main_menu_keyboard(lang='ru'):
     if lang == 'ru':
-        kb = [["➕ Новая задача", "📅 На сегодня"], ["📅 На завтра", "📅 На неделю"], ["📅 На месяц", "❓ Не сделано"], ["✅ Сделано", "📋 Все задачи"]]
+        kb = [
+            [KeyboardButton(text="➕ Новая задача"), KeyboardButton(text="📅 На сегодня")],
+            [KeyboardButton(text="📅 На завтра"), KeyboardButton(text="📅 На неделю")],
+            [KeyboardButton(text="📅 На месяц"), KeyboardButton(text="❓ Не сделано")],
+            [KeyboardButton(text="✅ Done"), KeyboardButton(text="📋 All Tasks")]
+        ]
     elif lang == 'uk':
-        kb = [["➕ Нова задача", "📅 На сьогодні"], ["📅 На завтра", "📅 На тиждень"], ["📅 На місяць", "❓ Не зроблено"], ["✅ Зроблено", "📋 Всі задачі"]]
+        kb = [
+            [KeyboardButton(text="➕ Нова задача"), KeyboardButton(text="📅 На сьогодні")],
+            [KeyboardButton(text="📅 На завтра"), KeyboardButton(text="📅 На тиждень")],
+            [KeyboardButton(text="📅 На місяць"), KeyboardButton(text="❓ Не зроблено")],
+            [KeyboardButton(text="✅ Done"), KeyboardButton(text="📋 All Tasks")]
+        ]
     else:
-        kb = [["➕ New Task", "📅 Today"], ["📅 Tomorrow", "📅 Week"], ["📅 Month", "❓ Not Done"], ["✅ Done", "📋 All Tasks"]]
+        kb = [
+            [KeyboardButton(text="➕ New Task"), KeyboardButton(text="📅 Today")],
+            [KeyboardButton(text="📅 Tomorrow"), KeyboardButton(text="📅 Week")],
+            [KeyboardButton(text="📅 Month"), KeyboardButton(text="❓ Not Done")],
+            [KeyboardButton(text="✅ Done"), KeyboardButton(text="📋 All Tasks")]
+        ]
+    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, persistent=True)
     def main_menu_keyboard(lang):
     if lang == 'ru':
         kb = [
