@@ -308,27 +308,22 @@ def main_menu_keyboard(lang='ru'):
         kb = [["➕ Нова задача", "📅 На сьогодні"], ["📅 На завтра", "📅 На тиждень"], ["📅 На місяць", "❓ Не зроблено"], ["✅ Зроблено", "📋 Всі задачі"]]
     else:
         kb = [["➕ New Task", "📅 Today"], ["📅 Tomorrow", "📅 Week"], ["📅 Month", "❓ Not Done"], ["✅ Done", "📋 All Tasks"]]
+    def main_menu_keyboard(lang):
+    if lang == 'ru':
+        kb = [
+            [KeyboardButton(text='➕ Новая задача'), KeyboardButton(text='📅 Сегодня')],
+            [KeyboardButton(text='📅 Завтра'), KeyboardButton(text='📅 Неделя')],
+            [KeyboardButton(text='📅 Месяц'), KeyboardButton(text='❓ Не сделано')],
+            [KeyboardButton(text='✅ Зроблено'), KeyboardButton(text='📋 Всі задачі')]
+        ]
+    else:
+        kb = [
+            [KeyboardButton(text='➕ New Task'), KeyboardButton(text='📅 Today')],
+            [KeyboardButton(text='📅 Tomorrow'), KeyboardButton(text='📅 Week')],
+            [KeyboardButton(text='📅 Month'), KeyboardButton(text='❓ Not Done')],
+            [KeyboardButton(text='✅ Done'), KeyboardButton(text='📋 All Tasks')]
+        ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, persistent=True)
-
-def payment_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳 Monobank", url=MONOBANK_URL)],
-        [InlineKeyboardButton(text=f"⭐ Telegram Stars ({STAR_PRICE})", callback_data="pay_stars")]
-    ])
-
-# ==============================
-# ХЕНДЛЕРИ
-# ==============================
-@dp.message(CommandStart())
-async def cmd_start(message: Message):
-    user_id = message.from_user.id
-    create_user(user_id, message.from_user.username, message.from_user.first_name)
-    await message.answer(TRANSLATIONS.get('ru', TRANSLATIONS['en'])['start_hello'],
-                         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                             [InlineKeyboardButton(text=name, callback_data=f"set_lang_{code}")]
-                             for code, name in LANGUAGES.items()
-                         ]))
-
 @dp.callback_query(F.data.startswith("set_lang_"))
 async def set_language(callback: CallbackQuery):
     lang = callback.data.split("_")[-1]
