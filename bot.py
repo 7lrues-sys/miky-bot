@@ -307,14 +307,14 @@ def main_menu_keyboard(lang='ru'):
             [KeyboardButton(text="➕ Новая задача"), KeyboardButton(text="📅 На сегодня")],
             [KeyboardButton(text="📅 На завтра"), KeyboardButton(text="📅 На неделю")],
             [KeyboardButton(text="📅 На месяц"), KeyboardButton(text="❓ Не сделано")],
-            [KeyboardButton(text="✅ Done"), KeyboardButton(text="📋 All Tasks")]
+            [KeyboardButton(text="✅ Сделано"), KeyboardButton(text="📋 Все задачи")]
         ]
     elif lang == 'uk':
         kb = [
             [KeyboardButton(text="➕ Нова задача"), KeyboardButton(text="📅 На сьогодні")],
             [KeyboardButton(text="📅 На завтра"), KeyboardButton(text="📅 На тиждень")],
             [KeyboardButton(text="📅 На місяць"), KeyboardButton(text="❓ Не зроблено")],
-            [KeyboardButton(text="✅ Done"), KeyboardButton(text="📋 All Tasks")]
+            [KeyboardButton(text="✅ Зроблено"), KeyboardButton(text="📋 Всі задачі")]
         ]
     else:
         kb = [
@@ -322,22 +322,6 @@ def main_menu_keyboard(lang='ru'):
             [KeyboardButton(text="📅 Tomorrow"), KeyboardButton(text="📅 Week")],
             [KeyboardButton(text="📅 Month"), KeyboardButton(text="❓ Not Done")],
             [KeyboardButton(text="✅ Done"), KeyboardButton(text="📋 All Tasks")]
-        ]
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, persistent=True)
-    def main_menu_keyboard(lang):
-    if lang == 'ru':
-        kb = [
-            [KeyboardButton(text='➕ Новая задача'), KeyboardButton(text='📅 Сегодня')],
-            [KeyboardButton(text='📅 Завтра'), KeyboardButton(text='📅 Неделя')],
-            [KeyboardButton(text='📅 Месяц'), KeyboardButton(text='❓ Не сделано')],
-            [KeyboardButton(text='✅ Зроблено'), KeyboardButton(text='📋 Всі задачі')]
-        ]
-    else:
-        kb = [
-            [KeyboardButton(text='➕ New Task'), KeyboardButton(text='📅 Today')],
-            [KeyboardButton(text='📅 Tomorrow'), KeyboardButton(text='📅 Week')],
-            [KeyboardButton(text='📅 Month'), KeyboardButton(text='❓ Not Done')],
-            [KeyboardButton(text='✅ Done'), KeyboardButton(text='📋 All Tasks')]
         ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, persistent=True)
 @dp.callback_query(F.data.startswith("set_lang_"))
